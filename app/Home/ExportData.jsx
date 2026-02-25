@@ -159,8 +159,9 @@ export default function ExportData() {
         .eq("document_id", doc.id)
         .single();
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error fetching full doc results:", error);
+      if (error) {
+        console.error("Error fetching full result:", error);
+        return;
       }
 
       const fullDoc = { ...doc, results: fullResult ? [fullResult] : [] };

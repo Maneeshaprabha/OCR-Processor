@@ -79,8 +79,9 @@ export default function Settings() {
         .eq('id', user.id)
         .single()
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error)
+      if (error) {
+        console.error('Error loading user profile:', error)
+        return
       }
 
       const userProfile = {
