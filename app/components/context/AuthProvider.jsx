@@ -38,14 +38,20 @@ export const AuthProvider = ({ children }) => {
   // ==============================
   useEffect(() => {
     const initAuth = async () => {
-      const { data } = await supabase.auth.getSession()
-      const currentUser = data.session?.user || null
-      setUser(currentUser)
+      try {
+        const { data } = await supabase.auth.getSession()
+        const currentUser = data.session?.user || null
+        setUser(currentUser)
 
-      if (currentUser) {
-        await fetchProfile(currentUser.id)
+        if (currentUser) {
+          await fetchProfile(currentUser.id)
+        }
+      } catch (error) {
+        console.error("Auth init error:", error)
+      } finally {
+        
+        setLoading(false) 
       }
-      setLoading(false)
     }
 
     initAuth()
@@ -57,8 +63,9 @@ export const AuthProvider = ({ children }) => {
       if (currentUser) {
         await fetchProfile(currentUser.id)
       } else {
-        setProfile(null) //if logged out, clear profile data
+        setProfile(null) 
       }
+      setLoading(false)
     })
 
     return () => {
