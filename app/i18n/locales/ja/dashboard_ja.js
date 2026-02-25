@@ -25,6 +25,7 @@ const ja = {
       pending: "保留中",
       processing: "処理中",
     },
+     noUploaded: " まだドキュメントはありません。 最初のドキュメントをアップロードして始めましょう!",
   },
   exportData: {
     title: "データをエクスポートする",
