@@ -6,78 +6,112 @@ import { useRouter } from "next/navigation"
 
 const AuthContext = createContext()
 
-// wrapping entire app with AuthProvider in layout.jsx, so all components can access auth state and functions via useAuth hook
 export const AuthProvider = ({ children }) => {
   const router = useRouter()
 
-  //  User state (Supabase Auth user)
-  const [user, setUser] = useState(null)
-
-  //  Profile state (theme_pref, language_pref, full_name, etc.)
+  // 🟢 States
+  const[user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
-
-  const [loading, setLoading] = useState(true)
+  const[loading, setLoading] = useState(true)
 
   // ==============================
-  //  the function to db fetch the profile  
+  // 🟢 1. Fetch Profile (Fixed .maybeSingle() typo)
   // ==============================
   const fetchProfile = async (userId) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle() // if profile doesn't exist, it won't throw an error, just return null
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle() // Single() වෙනුවට මේක පාවිච්චි කළා
 
-    if (!error && data) {
-      setProfile(data)
+      if (error) {
+        console.error("Profile fetch error:", error.message)
+        return null;
+      }
+
+      if (data) {
+        setProfile(data)
+      }
+    } catch (err) {
+      console.error("Failed to fetch profile:", err)
     }
   }
 
   // ==============================
-  //  Initial session check + Auth state listener
+  // 🟢 2. Init Auth & State Listener (Fixed Refresh & Loading bugs)
   // ==============================
   useEffect(() => {
+    let mounted = true; // Component unmount issue එක වලක්වන්න
+
     const initAuth = async () => {
       try {
-        const { data } = await supabase.auth.getSession()
-        const currentUser = data.session?.user || null
-        setUser(currentUser)
+        // getSession වෙනුවට getUser පාවිච්චි කිරීම (Refresh වලදී හරියටම වැඩ කරයි)
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.log("No active user session.");
+          if (mounted) {
+            setUser(null);
+            setProfile(null);
+          }
+          return;
+        }
+
+        if (mounted) {
+          setUser(currentUser)
+        }
 
         if (currentUser) {
           await fetchProfile(currentUser.id)
         }
       } catch (error) {
-        console.error("Auth init error:", error)
+        console.error("Auth init error:", error.message)
       } finally {
-        
-        setLoading(false) 
+        if (mounted) {
+          setLoading(false) // මොනවා වුනත් Loading අනිවාර්යයෙන්ම නතර වෙනවා
+        }
       }
     }
 
     initAuth()
 
+    // Auth State එක වෙනස් වෙද්දී (Login / Logout වෙද්දී)
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user || null
-      setUser(currentUser)
-
-      if (currentUser) {
-        await fetchProfile(currentUser.id)
-      } else {
-        setProfile(null) 
+      
+      if (mounted) {
+        setUser(currentUser)
+        
+        if (currentUser) {
+          await fetchProfile(currentUser.id)
+        } else {
+          setProfile(null) 
+        }
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     return () => {
-      listener.subscription.unsubscribe()
+      mounted = false;
+      listener?.subscription?.unsubscribe()
     }
-  }, [])
+  },[])
 
   // ==============================
-  // 🟢 Signup
-  // - Supabase Auth create + metadata send
-  // - profiles table insert handled by Trigger
-  // - Auto-login stopped, user login page redirect
+  // 🟢 3. Auto Cache Clear (පැයකට සැරයක් Next.js Cache එක අලුත් කරන්න)
+  // ==============================
+  useEffect(() => {
+    const ONE_HOUR = 3600000; // පැය 1යි
+    const autoClearCache = setInterval(() => {
+      router.refresh(); 
+    }, ONE_HOUR);
+
+    return () => clearInterval(autoClearCache);
+  },[router]);
+
+  // ==============================
+  // 🟢 4. Sign Up Function
   // ==============================
   const signUp = async (first_name, last_name, email, password, theme_pref, language_pref) => {
     setLoading(true)
@@ -96,19 +130,19 @@ export const AuthProvider = ({ children }) => {
       })
       if (error) throw error
 
-      // Supabase auto-login  stoping, so we won't setUser here. User will be null until they verify their email and log in.
+      // Auto-login වීම නවත්වනවා
       await supabase.auth.signOut()
 
-      setLoading(false)
       return data.user
     } catch (err) {
-      setLoading(false)
       throw err
+    } finally {
+      setLoading(false)
     }
   }
 
   // ==============================
-  // 🟢 SignIn
+  // 🟢 5. Sign In Function
   // ==============================
   const signIn = async (email, password) => {
     setLoading(true)
@@ -122,41 +156,42 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user)
       await fetchProfile(data.user.id)
 
-      setLoading(false)
       return data.user
     } catch (err) {
-      setLoading(false)
       throw err
+    } finally {
+      setLoading(false)
     }
   }
 
   // ==============================
-  // 🟢 SignOut
+  // 🟢 6. Sign Out Function (Hard Refresh එකත් එක්ක)
   // ==============================
- const signOut = async () => {
-    console.log("Signing out...");
-      // setTimeout(() => router.push("/login"), 1000)
-    
+  const signOut = async () => {
     try {
-      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      
       setUser(null);
       setProfile(null);
       
+      // Local Storage වල තියෙන පරණ Auth දේවල් මකනවා
+      for (let key in localStorage) {
+        if (key.startsWith('sb-')) {
+          localStorage.removeItem(key);
+        }
+      }
       
-      // router.push("/login") 
-    
+      // Force reload to Login page (Next.js Cache මකා දැමීම)
       window.location.href = "/login";
-
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
 
-
+  // ==============================
+  // 🟢 7. Reset Password (Forgot Password Page)
+  // ==============================
   const resetPassword = async (email) => {
     setLoading(true)
     try {
@@ -164,31 +199,53 @@ export const AuthProvider = ({ children }) => {
         redirectTo: `${window.location.origin}/reset-password`,
       })
       if (error) throw error
-      setLoading(false)
       return data
     } catch (err) {
-      setLoading(false)
       throw err
+    } finally {
+      setLoading(false)
     }
   }
 
   // ==============================
-  //  2. Update Password
+  // 🟢 8. Update Password (Settings Page)
   // ==============================
-  // const updatePassword = async (newPassword) => {
-  //   setLoading(true)
-  //   try {
-  //     const { data, error } = await supabase.auth.updateUser({
-  //       password: newPassword
-  //     })
-  //     if (error) throw error
-  //     setLoading(false)
-  //     return data
-  //   } catch (err) {
-  //     setLoading(false)
-  //     throw err
-  //   }
-  // }
+  const updateUserPassword = async (currentPassword, newPassword) => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentUserEmail = currentUser?.email;
+
+    if (!currentUserEmail) {
+      throw new Error("User email not found. Please log in again.");
+    }
+
+    // පරණ Password එක හරිද කියලා check කිරීම
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: currentUserEmail,
+      password: currentPassword
+    });
+
+    if (signInError) {
+      throw new Error("Current password is incorrect.");
+    }
+
+    // අලුත් එක Update කිරීම
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (updateError) {
+      if (updateError.message.includes("same as the old password")) {
+        throw new Error("New password must be different from current password.");
+      }
+      throw updateError;
+    }
+
+    return true;
+  };
+
+  // ==============================
+  // 🟢 9. Delete Account
+  // ==============================
   const deleteAccount = async () => {
     if (!user) throw new Error("Not logged in");
 
@@ -203,54 +260,22 @@ export const AuthProvider = ({ children }) => {
     if (!res.ok) throw new Error(data.error || "Failed to delete account");
 
     await supabase.auth.signOut();
-
     return data;
   };
 
-
-  const updateUserPassword = async (currentPassword, newPassword) => {
-
-    // 1. current user
-    const { data: { session } } = await supabase.auth.getSession();
-    const currentUserEmail = session?.user?.email;
-
-    if (!currentUserEmail) {
-      throw new Error("User email not found. Please log in again.");
-    }
-
-    // 2. 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: currentUserEmail,
-      password: currentPassword
-    });
-
-    if (signInError) {
-      throw new Error("Current password is incorrect.");
-    }
-    console.log("newPassword", newPassword);
-    // 3. 
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-
-    if (updateError) {
-      if (updateError.message.includes("same as the old password")) {
-        throw new Error("New password must be different from current password.");
-      }
-      throw new Error(updateError.message);
-    }
-
-    return true;
-  };
   // ==============================
-  //  Global context return
+  // 🟢 Return Context Provider
   // ==============================
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, resetPassword, updateUserPassword, deleteAccount }}>
+    <AuthContext.Provider value={{ 
+      user, profile, loading, 
+      signUp, signIn, signOut, 
+      resetPassword, updateUserPassword, deleteAccount 
+    }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-//  Hook for consuming AuthContext
+// 🟢 Hook for consuming AuthContext
 export const useAuth = () => useContext(AuthContext);
