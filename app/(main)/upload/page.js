@@ -1,4 +1,4 @@
-import DocumentUpload from "@/app/Dashboard/document_upload";
+import DocumentUpload from "@/app/Home/document_upload";
 
 
 export default function UploadPage() {
