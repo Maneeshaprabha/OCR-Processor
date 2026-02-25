@@ -582,7 +582,7 @@ export default function ProcessedResults() {
                 <div className="flex flex-col h-[300px] lg:h-auto lg:flex-1 min-h-0">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-bold text-foreground text-sm">
-                      {t("results.tabularData")}
+                      {t("results.extractedText")}
                     </h3>
                   </div>
                   <div className="flex-1 border border-border rounded-lg bg-card overflow-hidden relative group">
@@ -607,7 +607,8 @@ export default function ProcessedResults() {
                 <div className="flex flex-col h-[300px] lg:h-auto lg:flex-1 min-h-0">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-bold text-foreground text-sm">
-                      {t("results.translatedData")}                    </h3>
+                     {t("results.translatedText")}                   
+                      </h3>
                   </div>
                   <div className="flex-1 border border-border rounded-lg bg-card overflow-hidden relative group">
                     <div
