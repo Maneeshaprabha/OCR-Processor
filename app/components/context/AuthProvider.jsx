@@ -78,11 +78,10 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        first_name,
-        last_name,
         options: {
           data: {
-
+            first_name,
+            last_name,
             theme_pref,
             language_pref
           }
@@ -127,22 +126,22 @@ export const AuthProvider = ({ children }) => {
   // ==============================
   // 🟢 SignOut
   // ==============================
-  const signOut = async () => {
+ const signOut = async () => {
     console.log("Signing out...");
-    // setTimeout(() => router.push("/login"), 1000)
-
+      // setTimeout(() => router.push("/login"), 1000)
+    
     try {
-
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-
+      
       setUser(null);
       setProfile(null);
-
-
+      
+      
       // router.push("/login") 
-
+    
       window.location.href = "/login";
 
     } catch (error) {
