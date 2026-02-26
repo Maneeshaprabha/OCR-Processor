@@ -506,7 +506,7 @@ export default function ExportData() {
                         className="rounded-lg p-2 transition hover:bg-accent text-foreground"
                         aria-label={`View ${doc.file_name} in Results`}
                       >
-                      xxxxxxxxxxxxxxxxxxx  <Eye className="h-4 w-4" />
+                       <Eye className="h-4 w-4" />
                       </button>
                     </div>
                     <button
